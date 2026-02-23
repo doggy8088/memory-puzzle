@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>專屬回憶 3D 拼圖</title>
+    <style>
+        :root {
+            --primary-color: #f3f4f6;
+            --bg-color: #1a1a2e;
+            --accent-color: #e94560;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 遊戲主要排版：上中下結構，避免元素重疊 */
+        #game-layout {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            opacity: 0; /* 遊戲開始前隱藏 */
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        #game-layout.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 頂部狀態列 UI */
+        #hud-container {
+            flex-shrink: 0;
+            padding: 20px 10px 10px 10px;
+            display: flex;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #hud {
+            display: flex;
+            gap: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 12px 40px;
+            border-radius: 30px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .hud-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+
+        .hud-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .hud-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 畫布區域 (動態計算正方形) */
+        #canvas-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* 讓 flex 子元素可以縮小 */
+            padding: 10px;
+            position: relative;
+        }
+
+        /* 畫布容器本身 */
+        #canvas-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            background: radial-gradient(circle, rgba(40,40,60,1) 0%, rgba(26,26,46,1) 100%);
+        }
+
+        /* 底部控制列 */
+        #controls-container {
+            flex-shrink: 0;
+            padding: 10px 20px 30px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* 查看原圖按鈕 */
+        #preview-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #preview-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* 原圖預覽疊加層 */
+        #preview-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 150;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            flex-direction: column;
+        }
+
+        #preview-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #preview-img {
+            max-width: 90%;
+            max-height: 80%;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            object-fit: contain;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .preview-hint {
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        /* 進場說明畫面 */
+        #intro-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(22,33,62,0.95));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 200;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.8s ease, visibility 0.8s;
+        }
+
+        .intro-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .intro-title {
+            font-size: 2.2rem;
+            color: #ffd700;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .intro-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        /* 客製化上傳按鈕 */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(233, 69, 96, 0.4);
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(233, 69, 96, 0.6);
+            background: #f05a75;
+        }
+
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* 載入畫面 */
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 300;
+            display: none; 
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease;
+            opacity: 0;
+        }
+
+        #loading.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* 通關鼓勵彈跳視窗 */
+        #success-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+
+        #success-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, rgba(40,40,60,0.95), rgba(20,20,40,0.95));
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            width: 450px;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(233, 69, 96, 0.2);
+            transform: translateY(30px) scale(0.95);
+            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #success-modal.active .modal-content {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-title {
+            font-size: 2rem;
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .modal-stats {
+            margin: 20px 0;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #ddd;
+        }
+
+        .modal-message {
+            margin: 25px 0;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: #fff;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            font-style: italic;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        /* 適應手機小螢幕 */
+        @media (max-width: 600px) {
+            .intro-title { font-size: 1.8rem; }
+            .intro-text { font-size: 1rem; }
+            .modal-content { padding: 30px 20px; }
+            #hud { padding: 10px 20px; gap: 15px; }
+            .hud-value { font-size: 1.2rem; }
+            #preview-btn { padding: 10px 20px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 遊戲主排版區 (上中下結構) -->
+    <div id="game-layout">
+        <!-- 上：頂部資訊列 -->
+        <div id="hud-container">
+            <div id="hud">
+                <div class="hud-item">
+                    <span class="hud-label">遊戲時間</span>
+                    <span class="hud-value" id="time-display">00:00</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">移動次數</span>
+                    <span class="hud-value" id="moves-display">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中：3D 畫布容器 (自適應正方形) -->
+        <div id="canvas-wrapper">
+            <div id="canvas-container"></div>
+        </div>
+
+        <!-- 下：底部控制列 -->
+        <div id="controls-container">
+            <button id="preview-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                查看原圖
+            </button>
+        </div>
+    </div>
+
+    <!-- 原圖預覽疊加層 -->
+    <div id="preview-overlay">
+        <img id="preview-img" src="" alt="原圖預覽">
+        <div class="preview-hint">點擊畫面任意處關閉</div>
+    </div>
+
+    <!-- 進場說明畫面 -->
+    <div id="intro-screen">
+        <div class="intro-content">
+            <h1 class="intro-title">專屬回憶拼圖</h1>
+            <p class="intro-text">
+                每個碎片都承載著一段故事。<br>
+                請上傳或選擇一張對您具有特別意義的照片，<br>
+                讓我們一起在平靜的時光中，將它溫柔地重組。
+            </p>
+            <div class="upload-btn-wrapper">
+                <button class="btn-primary">選擇或拍攝照片</button>
+                <input type="file" accept="image/*" id="image-upload" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入中畫面 -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="font-size: 1.2rem; letter-spacing: 2px;">正在為您處理照片...</div>
+    </div>
+
+    <!-- 成功通關視窗 -->
+    <div id="success-modal">
+        <div class="modal-content">
+            <h2 class="modal-title">拼湊完整的回憶</h2>
+            <div class="modal-stats">
+                重組這段時光，您花費了 <b id="final-time" style="color:#e94560;">00:00</b><br>
+                並且輕柔地移動了 <b id="final-moves" style="color:#e94560;">0</b> 次碎片
+            </div>
+            <div class="modal-message">
+                每一次的嘗試與移動，都讓您離完美更近一步。<br>
+                這份耐心與專注，是您給自己最珍貴的禮物。<br>
+                請為自己的堅持鼓掌！
+            </div>
+            <button class="btn-primary" onclick="returnToIntro()" style="font-size: 1rem; padding: 10px 30px; margin-top: 15px;">重新創造回憶</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+    <script>
+        // --- 全局變數 ---
+        let scene, camera, renderer;
+        let pieces = [];
+        let particles = null;
+        let puzzleGroup = new THREE.Group();
+        
+        let gridRows = 4; // 預設 4x4 的正方形網格
+        let gridCols = 4;
+        const gap = 0.05; 
+        
+        let moveCount = 0;
+        let timeSeconds = 0;
+        let timerInterval = null;
+        let isGameActive = false;
+        
+        let selectedPiece = null;
+        let baseTexture = null;
+        let currentImageDataUrl = null;
+
+        // DOM 元素
+        const introScreen = document.getElementById('intro-screen');
+        const loadingScreen = document.getElementById('loading');
+        const gameLayout = document.getElementById('game-layout');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const canvasContainer = document.getElementById('canvas-container');
+        const timeDisplay = document.getElementById('time-display');
+        const movesDisplay = document.getElementById('moves-display');
+        const modal = document.getElementById('success-modal');
+        const imageUpload = document.getElementById('image-upload');
+        const previewBtn = document.getElementById('preview-btn');
+        const previewOverlay = document.getElementById('preview-overlay');
+        const previewImg = document.getElementById('preview-img');
+
+        // --- 初始化 ---
+        function init() {
+            scene = new THREE.Scene();
+
+            // 攝影機 (預設長寬比為 1，因為是正方形)
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+            camera.position.z = 12;
+
+            // 渲染器 (支援透明背景)
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            canvasContainer.appendChild(renderer.domElement);
+
+            // 光源設置
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            scene.add(directionalLight);
+
+            const backLight = new THREE.DirectionalLight(0x8a2be2, 0.3);
+            backLight.position.set(-5, -5, -5);
+            scene.add(backLight);
+
+            scene.add(puzzleGroup);
+
+            // 調整正方形畫布尺寸
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 監聽點擊 (針對畫布區域)
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            
+            // 監聽檔案上傳
+            imageUpload.addEventListener('change', handleImageUpload);
+            
+            // 原圖預覽互動
+            previewBtn.addEventListener('click', () => {
+                if(currentImageDataUrl) {
+                    previewImg.src = currentImageDataUrl;
+                    previewOverlay.classList.add('active');
+                }
+            });
+            previewOverlay.addEventListener('click', () => {
+                previewOverlay.classList.remove('active');
+            });
+
+            // 啟動渲染迴圈
+            animate();
+        }
+
+        // --- 動態計算正方形畫布大小 ---
+        function resizeCanvas() {
+            const width = canvasWrapper.clientWidth;
+            const height = canvasWrapper.clientHeight;
+            
+            // 取最小邊作為正方形的邊長
+            const size = Math.min(width, height) * 0.95; 
+
+            // 設定容器的寬高
+            canvasContainer.style.width = `${size}px`;
+            canvasContainer.style.height = `${size}px`;
+
+            // 設定攝影機與渲染器
+            camera.aspect = 1; 
+            camera.updateProjectionMatrix();
+            renderer.setSize(size, size);
+        }
+
+        // --- 處理圖片上傳與正中央裁切為正方形 ---
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            loadingScreen.classList.add('active');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const MAX_SIZE = 1024; 
+                    
+                    // 取圖片的最短邊
+                    const minSide = Math.min(img.width, img.height);
+                    
+                    // 計算置中裁切的起始座標 (X, Y)
+                    const startX = (img.width - minSide) / 2;
+                    const startY = (img.height - minSide) / 2;
+
+                    // 決定最終畫布的尺寸 (限制在 MAX_SIZE 以內以保護效能)
+                    const targetSize = Math.min(minSide, MAX_SIZE);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = targetSize;
+                    canvas.height = targetSize;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 將原圖置中裁切並繪製到正方形畫布上
+                    // ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+                    ctx.drawImage(
+                        img, 
+                        startX, startY, minSide, minSide, 
+                        0, 0, targetSize, targetSize
+                    );
+                    
+                    // 轉為 DataURL (經過裁切且品質優化的相片)
+                    const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    currentImageDataUrl = optimizedDataUrl; 
+                    
+                    loadTextureAndStart(optimizedDataUrl);
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // --- 載入材質與生成拼圖 ---
+        function loadTextureAndStart(imageUrl) {
+            const loader = new THREE.TextureLoader();
+            
+            loader.load(imageUrl, 
+                function(texture) {
+                    baseTexture = texture;
+                    
+                    // 由於圖片已經在裁切階段變成完美的 1:1 正方形
+                    // 因此固定總寬高皆為 8，並且使用 4x4 的網格
+                    const totalWidth = 8;
+                    const totalHeight = 8;
+                    gridRows = 4;
+                    gridCols = 4;
+
+                    createPuzzle(totalWidth, totalHeight);
+                    
+                    // 切換 UI，顯示遊戲排版
+                    introScreen.style.opacity = '0';
+                    introScreen.style.visibility = 'hidden';
+                    loadingScreen.classList.remove('active');
+                    
+                    // 確保畫布尺寸正確後，再顯示遊戲介面
+                    setTimeout(() => {
+                        resizeCanvas();
+                        gameLayout.classList.add('active');
+                    }, 100);
+                },
+                undefined,
+                function(err) {
+                    console.error('圖片載入失敗', err);
+                    alert('抱歉，照片處理發生錯誤，請重新嘗試。');
+                    loadingScreen.classList.remove('active');
+                }
+            );
+        }
+
+        function createPuzzle(totalWidth, totalHeight) {
+            while(puzzleGroup.children.length > 0){ 
+                const child = puzzleGroup.children[0];
+                if(child.geometry) child.geometry.dispose();
+                if(child.material) child.material.dispose();
+                puzzleGroup.remove(child); 
+            }
+            pieces = [];
+            puzzleGroup.rotation.set(0,0,0);
+            puzzleGroup.position.set(0,0,0);
+
+            const pieceWidth = totalWidth / gridCols;
+            const pieceHeight = totalHeight / gridRows;
+
+            // 設定適當的攝影機距離
+            camera.position.z = Math.max(totalWidth, totalHeight) * 1.2;
+
+            let positions = [];
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    positions.push({r, c});
+                }
+            }
+
+            let shuffledPositions = [...positions];
+            for (let i = shuffledPositions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledPositions[i], shuffledPositions[j]] = [shuffledPositions[j], shuffledPositions[i]];
+            }
+
+            const geometry = new THREE.BoxGeometry(pieceWidth - gap, pieceHeight - gap, 0.2);
+
+            for (let i = 0; i < positions.length; i++) {
+                const targetPos = positions[i];
+                const currentPos = shuffledPositions[i];
+
+                const material = new THREE.MeshStandardMaterial({
+                    map: baseTexture.clone(),
+                    roughness: 0.3,
+                    metalness: 0.1,
+                    color: 0xffffff
+                });
+                
+                material.map.needsUpdate = true;
+                material.map.repeat.set(1 / gridCols, 1 / gridRows);
+                material.map.offset.set(targetPos.c / gridCols, (gridRows - 1 - targetPos.r) / gridRows);
+
+                const piece = new THREE.Mesh(geometry, material);
+                piece.castShadow = true;
+                piece.receiveShadow = true;
+
+                piece.userData = {
+                    correctR: targetPos.r,
+                    correctC: targetPos.c,
+                    currentR: currentPos.r,
+                    currentC: currentPos.c,
+                    width: pieceWidth,
+                    height: pieceHeight,
+                    baseZ: 0
+                };
+
+                const pos3D = get3DPosition(currentPos.r, currentPos.c, pieceWidth, pieceHeight, totalWidth, totalHeight);
+                piece.position.copy(pos3D);
+
+                puzzleGroup.add(piece);
+                pieces.push(piece);
+            }
+
+            startGame();
+        }
+
+        function get3DPosition(r, c, pWidth, pHeight, tWidth, tHeight) {
+            const x = (c * pWidth) - (tWidth / 2) + (pWidth / 2);
+            const y = -((r * pHeight) - (tHeight / 2) + (pHeight / 2));
+            return new THREE.Vector3(x, y, 0);
+        }
+
+        function startGame() {
+            modal.classList.remove('active');
+            
+            moveCount = 0;
+            timeSeconds = 0;
+            isGameActive = true;
+            selectedPiece = null;
+            updateHUD();
+
+            if(particles) {
+                scene.remove(particles);
+                particles.geometry.dispose();
+                particles.material.dispose();
+                particles = null;
+            }
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeSeconds++;
+                updateHUD();
+            }, 1000);
+        }
+
+        function updateHUD() {
+            const mins = Math.floor(timeSeconds / 60).toString().padStart(2, '0');
+            const secs = (timeSeconds % 60).toString().padStart(2, '0');
+            timeDisplay.innerText = `${mins}:${secs}`;
+            movesDisplay.innerText = moveCount;
+        }
+
+        // --- 返回主選單 ---
+        function returnToIntro() {
+            modal.classList.remove('active');
+            gameLayout.classList.remove('active');
+            
+            while(puzzleGroup.children.length > 0){ 
+                const child = puzzleGroup.children[0];
+                if(child.geometry) child.geometry.dispose();
+                if(child.material) child.material.dispose();
+                puzzleGroup.remove(child); 
+            }
+            if(particles) {
+                scene.remove(particles);
+                particles.geometry.dispose();
+                particles.material.dispose();
+                particles = null;
+            }
+
+            imageUpload.value = '';
+            introScreen.style.visibility = 'visible';
+            introScreen.style.opacity = '1';
+        }
+
+        // --- 滑鼠與觸控互動 ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onPointerDown(event) {
+            if (!isGameActive) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(pieces);
+
+            if (intersects.length > 0) {
+                const clickedPiece = intersects[0].object;
+
+                if (selectedPiece === null) {
+                    selectPiece(clickedPiece);
+                } else {
+                    if (selectedPiece === clickedPiece) {
+                        deselectPiece(selectedPiece);
+                        selectedPiece = null;
+                    } else {
+                        swapPieces(selectedPiece, clickedPiece);
+                        selectedPiece = null;
+                        
+                        moveCount++;
+                        updateHUD();
+                    }
+                }
+            } else {
+                if (selectedPiece) {
+                    deselectPiece(selectedPiece);
+                    selectedPiece = null;
+                }
+            }
+        }
+
+        function selectPiece(piece) {
+            selectedPiece = piece;
+            new TWEEN.Tween(piece.position)
+                .to({ z: 0.5 }, 200)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+            piece.material.emissive.setHex(0x333333);
+        }
+
+        function deselectPiece(piece) {
+            new TWEEN.Tween(piece.position)
+                .to({ z: piece.userData.baseZ }, 200)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+            piece.material.emissive.setHex(0x000000);
+        }
+
+        function swapPieces(piece1, piece2) {
+            const tempR = piece1.userData.currentR;
+            const tempC = piece1.userData.currentC;
+            piece1.userData.currentR = piece2.userData.currentR;
+            piece1.userData.currentC = piece2.userData.currentC;
+            piece2.userData.currentR = tempR;
+            piece2.userData.currentC = tempC;
+
+            const pos1 = piece1.position.clone();
+            const pos2 = piece2.position.clone();
+
+            new TWEEN.Tween(piece1.position)
+                .to({ x: pos2.x, y: pos2.y, z: piece1.userData.baseZ }, 300)
+                .easing(TWEEN.Easing.Cubic.InOut)
+                .start();
+            piece1.material.emissive.setHex(0x000000);
+
+            new TWEEN.Tween(piece2.position)
+                .to({ x: pos1.x, y: pos1.y, z: 0.2 }, 150)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onComplete(() => {
+                    new TWEEN.Tween(piece2.position)
+                        .to({ z: piece2.userData.baseZ }, 150)
+                        .easing(TWEEN.Easing.Quadratic.In)
+                        .start();
+                })
+                .start();
+
+            setTimeout(checkWinCondition, 350);
+        }
+
+        // --- 勝利判定與動畫 ---
+        function checkWinCondition() {
+            let isWin = true;
+            for (let i = 0; i < pieces.length; i++) {
+                const p = pieces[i].userData;
+                if (p.currentR !== p.correctR || p.currentC !== p.correctC) {
+                    isWin = false;
+                    break;
+                }
+            }
+
+            if (isWin && isGameActive) {
+                triggerWinSequence();
+            }
+        }
+
+        function triggerWinSequence() {
+            isGameActive = false;
+            clearInterval(timerInterval);
+
+            // 1. 消除間隙
+            pieces.forEach(piece => {
+                const pWidth = piece.userData.width;
+                const pHeight = piece.userData.height;
+                const tWidth = pWidth * gridCols;
+                const tHeight = pHeight * gridRows;
+                
+                const exactX = (piece.userData.currentC * pWidth) - (tWidth / 2) + (pWidth / 2);
+                const exactY = -((piece.userData.currentR * pHeight) - (tHeight / 2) + (pHeight / 2));
+
+                const newGeom = new THREE.BoxGeometry(pWidth, pHeight, 0.2);
+                piece.geometry.dispose();
+                piece.geometry = newGeom;
+
+                new TWEEN.Tween(piece.position)
+                    .to({ x: exactX, y: exactY, z: 0 }, 500)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .start();
+            });
+
+            // 2. 升起、旋轉與特效
+            setTimeout(() => {
+                new TWEEN.Tween(puzzleGroup.position)
+                    .to({ z: 1.5 }, 1500)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                new TWEEN.Tween(puzzleGroup.rotation)
+                    .to({ y: Math.PI * 2, x: 0.1 }, 3000)
+                    .easing(TWEEN.Easing.Cubic.InOut)
+                    .start();
+                
+                createConfetti();
+            }, 600);
+
+            // 3. 顯示結果視窗
+            setTimeout(() => {
+                document.getElementById('final-time').innerText = timeDisplay.innerText;
+                document.getElementById('final-moves').innerText = moveCount;
+                modal.classList.add('active');
+            }, 2500);
+        }
+
+        function createConfetti() {
+            const particleCount = 200;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = [];
+            const colors = new Float32Array(particleCount * 3);
+            const colorPalette = [new THREE.Color(0xffd700), new THREE.Color(0xff6b6b), new THREE.Color(0x4ecdc4), new THREE.Color(0xffffff)];
+
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 2;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 2;
+                positions[i * 3 + 2] = 2;
+
+                velocities.push({
+                    x: (Math.random() - 0.5) * 0.2,
+                    y: Math.random() * 0.2 + 0.1,
+                    z: (Math.random() - 0.5) * 0.2
+                });
+
+                const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 16; canvas.height = 16;
+            const context = canvas.getContext('2d');
+            context.beginPath();
+            context.arc(8, 8, 8, 0, Math.PI * 2);
+            context.fillStyle = 'white';
+            context.fill();
+            const texture = new THREE.CanvasTexture(canvas);
+
+            const material = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                map: texture,
+                transparent: true,
+                opacity: 0.8,
+                alphaTest: 0.5
+            });
+
+            particles = new THREE.Points(geometry, material);
+            particles.userData = { velocities };
+            scene.add(particles);
+        }
+
+        // --- 核心更新 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+
+            if (particles) {
+                const positions = particles.geometry.attributes.position.array;
+                const vels = particles.userData.velocities;
+
+                for (let i = 0; i < vels.length; i++) {
+                    positions[i * 3] += vels[i].x;
+                    positions[i * 3 + 1] += vels[i].y;
+                    positions[i * 3 + 2] += vels[i].z;
+                    vels[i].y -= 0.005; // 重力
+                    vels[i].x += (Math.random() - 0.5) * 0.01;
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (isGameActive && puzzleGroup) {
+                const time = Date.now() * 0.001;
+                puzzleGroup.position.y = Math.sin(time) * 0.1;
+                puzzleGroup.rotation.z = Math.sin(time * 0.5) * 0.01;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
