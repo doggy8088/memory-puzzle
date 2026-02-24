@@ -367,6 +367,31 @@
             border-left: 4px solid var(--accent-color);
         }
 
+        /* 頁尾版權聲明 */
+        #site-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.45);
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #site-footer a {
+            color: rgba(255, 255, 255, 0.65);
+            text-decoration: none;
+            pointer-events: auto;
+        }
+
+        #site-footer a:hover {
+            color: var(--accent-color);
+        }
+
         /* 適應手機小螢幕 */
         @media (max-width: 600px) {
             .intro-title { font-size: 1.8rem; }
@@ -377,6 +402,14 @@
             #preview-btn { padding: 10px 20px; font-size: 1rem; }
         }
     </style>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
 </head>
 <body>
 
@@ -1017,5 +1050,10 @@
         window.onload = init;
 
     </script>
+
+    <!-- 頁尾版權聲明 -->
+    <footer id="site-footer">
+        本站由 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer">Will 保哥的技術交流中心</a> 設計、開發與維護 &nbsp;|&nbsp; Copyright &copy; 2026 Will 保哥
+    </footer>
 </body>
 </html>
