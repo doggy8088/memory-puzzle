@@ -142,6 +142,20 @@ Use this default numbering logic for `--name` argument:
 3. Compute the next `N` as `max + 1` (default to `1` if no matches exist).
 4. Generate with filename `images/generated-{N}.png`.
 
+### 3. Post-image-generation rule
+After generating images, derive `N` from current generated files before updating code:
+1. Scan `images/generated-*.png`.
+2. Extract numeric suffixes and set `N` to the maximum suffix (example: latest is `generated-14.png` => `N = 14`).
+3. Replace hard-coded magic numbers with `N`, for example:
+
+```js
+const generatedSources = Array.from({ length: 10 }, (_, i) => `images/generated-${i + 1}.png`);
+```
+
+```js
+const generatedSources = Array.from({ length: N }, (_, i) => `images/generated-${i + 1}.png`);
+```
+
 ## Script Notes
 - Requires `GEMINI_API_KEY` in the environment.
 - Expects the Gemini response to include `inlineData.data` (base64 image).
