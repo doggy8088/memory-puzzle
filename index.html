@@ -149,11 +149,8 @@
 
         /* 原圖預覽疊加層 */
         #preview-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            bottom: calc(var(--footer-space) + var(--safe-bottom));
+            position: fixed;
+            inset: 0;
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
