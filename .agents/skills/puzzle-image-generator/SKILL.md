@@ -130,20 +130,13 @@ no grid, no segmentation, no labels, no typography. --AR 1:1
 50. Hyperreal macro photography
 
 ### 2. Generate the image
-Run the script with your prompt and optional output folder. If no output folder is provided,
-the image is saved under `nanobanana-output`.
-
-```bash
-node scripts/generate_puzzle_image.js --prompt "YOUR_PROMPT_HERE" --out "optional/output/folder"
-```
-
-Optional filename:
+Run the script with your prompt and optional output folder. If no output folder is provided, the image is saved under `images`.
 
 ```bash
 node scripts/generate_puzzle_image.js --prompt "YOUR_PROMPT_HERE" --out "optional/output/folder" --name "my-image.png"
 ```
 
-If `--name` is not provided, use this default numbering logic:
+Use this default numbering logic for `--name` argument:
 1. Scan `images/generated-*.png`.
 2. Extract numeric suffixes from matching filenames.
 3. Compute the next `N` as `max + 1` (default to `1` if no matches exist).
