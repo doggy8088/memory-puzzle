@@ -303,6 +303,13 @@
 
         .preset-gallery {
             margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .preset-row {
+            width: 100%;
         }
 
         .preset-title {
@@ -550,16 +557,13 @@
                 <input type="file" accept="image/*" id="image-upload" />
             </div>
             <div class="preset-gallery">
-                <div class="preset-title">或直接選擇預設照片快速開始</div>
-                <div class="preset-grid">
-                    <button class="preset-image-btn" data-src="images/1.png" aria-label="使用預設照片 1"><img src="images/1.png" alt="預設照片 1"></button>
-                    <button class="preset-image-btn" data-src="images/2.png" aria-label="使用預設照片 2"><img src="images/2.png" alt="預設照片 2"></button>
-                    <button class="preset-image-btn" data-src="images/3.png" aria-label="使用預設照片 3"><img src="images/3.png" alt="預設照片 3"></button>
-                    <button class="preset-image-btn" data-src="images/4.png" aria-label="使用預設照片 4"><img src="images/4.png" alt="預設照片 4"></button>
-                    <button class="preset-image-btn" data-src="images/5.png" aria-label="使用預設照片 5"><img src="images/5.png" alt="預設照片 5"></button>
-                    <button class="preset-image-btn" data-src="images/6.png" aria-label="使用預設照片 6"><img src="images/6.png" alt="預設照片 6"></button>
-                    <button class="preset-image-btn" data-src="images/7.png" aria-label="使用預設照片 7"><img src="images/7.png" alt="預設照片 7"></button>
-                    <button class="preset-image-btn" data-src="images/8.png" aria-label="使用預設照片 8"><img src="images/8.png" alt="預設照片 8"></button>
+                <div class="preset-row">
+                    <div class="preset-title">本小時精選（每小時更新）</div>
+                    <div class="preset-grid" id="preset-grid-hourly"></div>
+                </div>
+                <div class="preset-row">
+                    <div class="preset-title">生成圖片隨機精選</div>
+                    <div class="preset-grid" id="preset-grid-generated"></div>
                 </div>
             </div>
         </div>
@@ -632,12 +636,105 @@
         const previewOverlay = document.getElementById('preview-overlay');
         const previewImg = document.getElementById('preview-img');
         const exitGameBtn = document.getElementById('exit-game-btn');
-        const presetImageButtons = document.querySelectorAll('.preset-image-btn');
+        const presetGridHourly = document.getElementById('preset-grid-hourly');
+        const presetGridGenerated = document.getElementById('preset-grid-generated');
+        const HOURLY_PRESET_CACHE_KEY = 'memory-puzzle-hourly-presets-v1';
+        let lastRenderedPresetHourKey = '';
 
         function updateFooterSpace() {
             const siteFooter = document.getElementById('site-footer');
             const footerHeight = siteFooter ? siteFooter.offsetHeight : 56;
             document.documentElement.style.setProperty('--footer-space', `${footerHeight}px`);
+        }
+
+        function getPresetHourKey() {
+            const now = new Date();
+            return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}`;
+        }
+
+        function shuffleArray(items) {
+            const arr = [...items];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function pickRandomItems(items, count) {
+            return shuffleArray(items).slice(0, count);
+        }
+
+        function getHourlyPresetSources() {
+            const hourKey = getPresetHourKey();
+            const baseSources = Array.from({ length: 8 }, (_, i) => `images/${i + 1}.png`);
+            try {
+                const cachedRaw = localStorage.getItem(HOURLY_PRESET_CACHE_KEY);
+                if (cachedRaw) {
+                    const cached = JSON.parse(cachedRaw);
+                    if (
+                        cached &&
+                        cached.hourKey === hourKey &&
+                        Array.isArray(cached.items) &&
+                        cached.items.length === 4
+                    ) {
+                        return cached.items;
+                    }
+                }
+
+                const nextItems = pickRandomItems(baseSources, 4);
+                localStorage.setItem(HOURLY_PRESET_CACHE_KEY, JSON.stringify({ hourKey, items: nextItems }));
+                return nextItems;
+            } catch {
+                return pickRandomItems(baseSources, 4);
+            }
+        }
+
+        function getGeneratedPresetSources() {
+            const generatedSources = Array.from({ length: 10 }, (_, i) => `images/generated-${i + 1}.png`);
+            return pickRandomItems(generatedSources, 4);
+        }
+
+        function createPresetButton(imageSrc, label) {
+            const button = document.createElement('button');
+            button.className = 'preset-image-btn';
+            button.type = 'button';
+            button.dataset.src = imageSrc;
+            button.setAttribute('aria-label', label);
+            button.title = label;
+            button.addEventListener('click', handlePresetImageSelect);
+
+            const image = document.createElement('img');
+            image.src = imageSrc;
+            image.alt = label;
+            button.appendChild(image);
+
+            return button;
+        }
+
+        function renderPresetGallery() {
+            if (!presetGridHourly || !presetGridGenerated) return;
+
+            presetGridHourly.innerHTML = '';
+            presetGridGenerated.innerHTML = '';
+
+            const hourlyImages = getHourlyPresetSources();
+            const generatedImages = getGeneratedPresetSources();
+
+            hourlyImages.forEach((src, index) => {
+                presetGridHourly.appendChild(createPresetButton(src, `本小時精選圖片 ${index + 1}`));
+            });
+
+            generatedImages.forEach((src, index) => {
+                presetGridGenerated.appendChild(createPresetButton(src, `生成精選圖片 ${index + 1}`));
+            });
+
+            lastRenderedPresetHourKey = getPresetHourKey();
+        }
+
+        function refreshHourlyPresetsIfNeeded() {
+            if (getPresetHourKey() === lastRenderedPresetHourKey) return;
+            renderPresetGallery();
         }
 
         function setExitButtonVisible(visible) {
@@ -698,6 +795,7 @@
             window.addEventListener('resize', resizeCanvas);
             window.addEventListener('resize', updateFooterSpace);
             window.addEventListener('resize', updateExitButtonPosition);
+            setInterval(refreshHourlyPresetsIfNeeded, 30000);
 
             // 監聽點擊與拖曳交換 (針對畫布區域)
             renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -707,10 +805,8 @@
 
             // 監聽檔案上傳
             imageUpload.addEventListener('change', handleImageUpload);
-            presetImageButtons.forEach(button => {
-                button.addEventListener('click', handlePresetImageSelect);
-            });
             exitGameBtn.addEventListener('click', handleExitGame);
+            renderPresetGallery();
             setExitButtonVisible(false);
             updateExitButtonPosition();
 
@@ -1020,6 +1116,7 @@
             introScreen.style.visibility = 'visible';
             introScreen.style.opacity = '1';
             shouldStartAfterInitialPreview = false;
+            renderPresetGallery();
         }
 
         // --- 滑鼠與觸控互動 ---
