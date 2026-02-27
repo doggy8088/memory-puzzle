@@ -266,6 +266,46 @@
             width: 100%;
         }
 
+        .preset-gallery {
+            margin-top: 24px;
+        }
+
+        .preset-title {
+            font-size: 0.9rem;
+            color: #b8bdd0;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .preset-image-btn {
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 0;
+            overflow: hidden;
+            cursor: pointer;
+            aspect-ratio: 1 / 1;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .preset-image-btn:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 215, 0, 0.75);
+        }
+
+        .preset-image-btn img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
         /* 載入畫面 */
         #loading {
             position: absolute;
@@ -400,6 +440,7 @@
             #hud { padding: 10px 20px; gap: 15px; }
             .hud-value { font-size: 1.2rem; }
             #preview-btn { padding: 10px 20px; font-size: 1rem; }
+            .preset-grid { gap: 8px; }
         }
     </style>
     <!-- Google tag (gtag.js) -->
@@ -466,6 +507,19 @@
                 <button class="btn-primary">選擇或拍攝照片</button>
                 <input type="file" accept="image/*" id="image-upload" />
             </div>
+            <div class="preset-gallery">
+                <div class="preset-title">或直接選擇預設照片快速開始</div>
+                <div class="preset-grid">
+                    <button class="preset-image-btn" data-src="images/1.png" aria-label="使用預設照片 1"><img src="images/1.png" alt="預設照片 1"></button>
+                    <button class="preset-image-btn" data-src="images/2.png" aria-label="使用預設照片 2"><img src="images/2.png" alt="預設照片 2"></button>
+                    <button class="preset-image-btn" data-src="images/3.png" aria-label="使用預設照片 3"><img src="images/3.png" alt="預設照片 3"></button>
+                    <button class="preset-image-btn" data-src="images/4.png" aria-label="使用預設照片 4"><img src="images/4.png" alt="預設照片 4"></button>
+                    <button class="preset-image-btn" data-src="images/5.png" aria-label="使用預設照片 5"><img src="images/5.png" alt="預設照片 5"></button>
+                    <button class="preset-image-btn" data-src="images/6.png" aria-label="使用預設照片 6"><img src="images/6.png" alt="預設照片 6"></button>
+                    <button class="preset-image-btn" data-src="images/7.png" aria-label="使用預設照片 7"><img src="images/7.png" alt="預設照片 7"></button>
+                    <button class="preset-image-btn" data-src="images/8.png" aria-label="使用預設照片 8"><img src="images/8.png" alt="預設照片 8"></button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -517,6 +571,7 @@
         let isDraggingPiece = false;
         let dragStartClientX = 0;
         let dragStartClientY = 0;
+        let shouldStartAfterInitialPreview = false;
         let baseTexture = null;
         let currentImageDataUrl = null;
 
@@ -533,6 +588,7 @@
         const previewBtn = document.getElementById('preview-btn');
         const previewOverlay = document.getElementById('preview-overlay');
         const previewImg = document.getElementById('preview-img');
+        const presetImageButtons = document.querySelectorAll('.preset-image-btn');
 
         function updateFooterSpace() {
             const siteFooter = document.getElementById('site-footer');
@@ -586,6 +642,9 @@
 
             // 監聽檔案上傳
             imageUpload.addEventListener('change', handleImageUpload);
+            presetImageButtons.forEach(button => {
+                button.addEventListener('click', handlePresetImageSelect);
+            });
 
             // 原圖預覽互動
             previewBtn.addEventListener('click', () => {
@@ -596,6 +655,10 @@
             });
             previewOverlay.addEventListener('click', () => {
                 previewOverlay.classList.remove('active');
+                if (shouldStartAfterInitialPreview) {
+                    shouldStartAfterInitialPreview = false;
+                    startGame();
+                }
             });
 
             // 啟動渲染迴圈
@@ -625,46 +688,61 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            loadingScreen.classList.add('active');
-
             const reader = new FileReader();
             reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const MAX_SIZE = 1024;
-
-                    // 取圖片的最短邊
-                    const minSide = Math.min(img.width, img.height);
-
-                    // 計算置中裁切的起始座標 (X, Y)
-                    const startX = (img.width - minSide) / 2;
-                    const startY = (img.height - minSide) / 2;
-
-                    // 決定最終畫布的尺寸 (限制在 MAX_SIZE 以內以保護效能)
-                    const targetSize = Math.min(minSide, MAX_SIZE);
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = targetSize;
-                    canvas.height = targetSize;
-                    const ctx = canvas.getContext('2d');
-
-                    // 將原圖置中裁切並繪製到正方形畫布上
-                    // ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
-                    ctx.drawImage(
-                        img,
-                        startX, startY, minSide, minSide,
-                        0, 0, targetSize, targetSize
-                    );
-
-                    // 轉為 DataURL (經過裁切且品質優化的相片)
-                    const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                    currentImageDataUrl = optimizedDataUrl;
-
-                    loadTextureAndStart(optimizedDataUrl);
-                }
-                img.src = e.target.result;
+                processImageSource(e.target.result);
             }
             reader.readAsDataURL(file);
+        }
+
+        function handlePresetImageSelect(event) {
+            const imageSrc = event.currentTarget.dataset.src;
+            if (!imageSrc) return;
+            processImageSource(imageSrc);
+        }
+
+        function processImageSource(imageSrc) {
+            loadingScreen.classList.add('active');
+            shouldStartAfterInitialPreview = false;
+
+            const img = new Image();
+            img.onload = function() {
+                const MAX_SIZE = 1024;
+
+                // 取圖片的最短邊
+                const minSide = Math.min(img.width, img.height);
+
+                // 計算置中裁切的起始座標 (X, Y)
+                const startX = (img.width - minSide) / 2;
+                const startY = (img.height - minSide) / 2;
+
+                // 決定最終畫布的尺寸 (限制在 MAX_SIZE 以內以保護效能)
+                const targetSize = Math.min(minSide, MAX_SIZE);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = targetSize;
+                canvas.height = targetSize;
+                const ctx = canvas.getContext('2d');
+
+                // 將原圖置中裁切並繪製到正方形畫布上
+                // ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+                ctx.drawImage(
+                    img,
+                    startX, startY, minSide, minSide,
+                    0, 0, targetSize, targetSize
+                );
+
+                // 轉為 DataURL (經過裁切且品質優化的相片)
+                const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                currentImageDataUrl = optimizedDataUrl;
+
+                loadTextureAndStart(optimizedDataUrl);
+            }
+            img.onerror = function() {
+                alert('抱歉，照片處理發生錯誤，請重新嘗試。');
+                loadingScreen.classList.remove('active');
+            }
+            img.src = imageSrc;
         }
 
         // --- 載入材質與生成拼圖 ---
@@ -683,6 +761,7 @@
                     gridCols = 4;
 
                     createPuzzle(totalWidth, totalHeight);
+                    prepareGameBeforeStart();
 
                     // 切換 UI，顯示遊戲排版
                     introScreen.style.opacity = '0';
@@ -693,6 +772,13 @@
                     setTimeout(() => {
                         resizeCanvas();
                         gameLayout.classList.add('active');
+                        if (currentImageDataUrl) {
+                            previewImg.src = currentImageDataUrl;
+                            shouldStartAfterInitialPreview = true;
+                            previewOverlay.classList.add('active');
+                        } else {
+                            startGame();
+                        }
                     }, 100);
                 },
                 undefined,
@@ -772,7 +858,6 @@
                 pieces.push(piece);
             }
 
-            startGame();
         }
 
         function get3DPosition(r, c, pWidth, pHeight, tWidth, tHeight) {
@@ -807,6 +892,23 @@
             }, 1000);
         }
 
+        function prepareGameBeforeStart() {
+            modal.classList.remove('active');
+            moveCount = 0;
+            timeSeconds = 0;
+            isGameActive = false;
+            selectedPiece = null;
+            dragSourcePiece = null;
+            activePointerId = null;
+            isDraggingPiece = false;
+            updateHUD();
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
         function updateHUD() {
             const mins = Math.floor(timeSeconds / 60).toString().padStart(2, '0');
             const secs = (timeSeconds % 60).toString().padStart(2, '0');
@@ -835,6 +937,7 @@
             imageUpload.value = '';
             introScreen.style.visibility = 'visible';
             introScreen.style.opacity = '1';
+            shouldStartAfterInitialPreview = false;
         }
 
         // --- 滑鼠與觸控互動 ---
@@ -927,7 +1030,12 @@
 
             const targetPiece = isDraggingPiece ? getPieceFromPointer(event, dragSourcePiece) : null;
             if (isDraggingPiece && selectedPiece === dragSourcePiece && targetPiece) {
-                swapPieces(dragSourcePiece, targetPiece);
+                const pWidth = dragSourcePiece.userData.width;
+                const pHeight = dragSourcePiece.userData.height;
+                const tWidth = pWidth * gridCols;
+                const tHeight = pHeight * gridRows;
+                const sourceHomePos = get3DPosition(dragSourcePiece.userData.currentR, dragSourcePiece.userData.currentC, pWidth, pHeight, tWidth, tHeight);
+                swapPieces(dragSourcePiece, targetPiece, sourceHomePos);
                 selectedPiece = null;
                 moveCount++;
                 updateHUD();
@@ -994,7 +1102,7 @@
             piece.material.emissive.setHex(0x000000);
         }
 
-        function swapPieces(piece1, piece2) {
+        function swapPieces(piece1, piece2, piece2TargetPos = null) {
             const tempR = piece1.userData.currentR;
             const tempC = piece1.userData.currentC;
             piece1.userData.currentR = piece2.userData.currentR;
@@ -1002,27 +1110,37 @@
             piece2.userData.currentR = tempR;
             piece2.userData.currentC = tempC;
 
-            const pos1 = piece1.position.clone();
+            const pos1 = piece2TargetPos ? piece2TargetPos.clone() : piece1.position.clone();
             const pos2 = piece2.position.clone();
+            const swapDuration = 450;
+            const settleDuration = 180;
+            const travelZ = 0.45;
 
             new TWEEN.Tween(piece1.position)
-                .to({ x: pos2.x, y: pos2.y, z: piece1.userData.baseZ }, 300)
+                .to({ x: pos2.x, y: pos2.y, z: travelZ }, swapDuration)
                 .easing(TWEEN.Easing.Cubic.InOut)
+                .onComplete(() => {
+                    new TWEEN.Tween(piece1.position)
+                        .to({ z: piece1.userData.baseZ }, settleDuration)
+                        .easing(TWEEN.Easing.Quadratic.Out)
+                        .start();
+                })
                 .start();
             piece1.material.emissive.setHex(0x000000);
 
             new TWEEN.Tween(piece2.position)
-                .to({ x: pos1.x, y: pos1.y, z: 0.2 }, 150)
-                .easing(TWEEN.Easing.Quadratic.Out)
+                .to({ x: pos1.x, y: pos1.y, z: travelZ }, swapDuration)
+                .easing(TWEEN.Easing.Cubic.InOut)
                 .onComplete(() => {
                     new TWEEN.Tween(piece2.position)
-                        .to({ z: piece2.userData.baseZ }, 150)
-                        .easing(TWEEN.Easing.Quadratic.In)
+                        .to({ z: piece2.userData.baseZ }, settleDuration)
+                        .easing(TWEEN.Easing.Quadratic.Out)
                         .start();
                 })
                 .start();
+            piece2.material.emissive.setHex(0x000000);
 
-            setTimeout(checkWinCondition, 350);
+            setTimeout(checkWinCondition, swapDuration + settleDuration + 60);
         }
 
         // --- 勝利判定與動畫 ---
