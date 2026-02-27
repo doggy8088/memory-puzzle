@@ -558,11 +558,9 @@
             </div>
             <div class="preset-gallery">
                 <div class="preset-row">
-                    <div class="preset-title">本小時精選（每小時更新）</div>
                     <div class="preset-grid" id="preset-grid-hourly"></div>
                 </div>
                 <div class="preset-row">
-                    <div class="preset-title">生成圖片隨機精選</div>
                     <div class="preset-grid" id="preset-grid-generated"></div>
                 </div>
             </div>
@@ -1381,6 +1379,7 @@
             setTimeout(() => {
                 document.getElementById('final-time').innerText = timeDisplay.innerText;
                 document.getElementById('final-moves').innerText = moveCount;
+                setExitButtonVisible(false);
                 modal.classList.add('active');
             }, 2500);
         }
