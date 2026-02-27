@@ -1,0 +1,4 @@
+interface:
+  display_name: "Puzzle Image Generator"
+  short_description: "Generate puzzle-ready images with Gemini"
+  default_prompt: "Use $puzzle-image-generator to create a puzzle background prompt and render an image."
