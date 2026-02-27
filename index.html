@@ -147,6 +147,41 @@
             transform: translateY(-2px);
         }
 
+        /* 右上角退出按鈕 */
+        #exit-game-btn {
+            position: fixed;
+            top: calc(env(safe-area-inset-top, 0px) + 34px);
+            right: 12px;
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            background: var(--glass-bg);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+            z-index: 1300;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-50%);
+            transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+        }
+
+        #exit-game-btn.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #exit-game-btn:hover {
+            transform: translateY(calc(-50% - 2px));
+            background: rgba(233, 69, 96, 0.35);
+        }
+
         /* 原圖預覽疊加層 */
         #preview-overlay {
             position: fixed;
@@ -437,12 +472,15 @@
             .intro-title { font-size: 1.8rem; }
             .intro-text { font-size: 1rem; }
             .modal-content { padding: 30px 20px; }
+            #hud-container { justify-content: flex-start; padding: 20px 12px 10px 12px; }
             #hud { padding: 10px 20px; gap: 15px; }
             .hud-value { font-size: 1.2rem; }
             #preview-btn { padding: 10px 20px; font-size: 1rem; }
+            #exit-game-btn { width: 42px; height: 42px; }
             .preset-grid { gap: 8px; }
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-PVHEZD5XM3"></script>
     <script>
@@ -454,6 +492,10 @@
     </script>
 </head>
 <body>
+
+    <button id="exit-game-btn" aria-label="退出遊戲" title="退出遊戲">
+        <i class="fa-solid fa-right-from-bracket"></i>
+    </button>
 
     <!-- 遊戲主排版區 (上中下結構) -->
     <div id="game-layout">
@@ -581,6 +623,7 @@
         const gameLayout = document.getElementById('game-layout');
         const canvasWrapper = document.getElementById('canvas-wrapper');
         const canvasContainer = document.getElementById('canvas-container');
+        const hudPanel = document.getElementById('hud');
         const timeDisplay = document.getElementById('time-display');
         const movesDisplay = document.getElementById('moves-display');
         const modal = document.getElementById('success-modal');
@@ -588,12 +631,33 @@
         const previewBtn = document.getElementById('preview-btn');
         const previewOverlay = document.getElementById('preview-overlay');
         const previewImg = document.getElementById('preview-img');
+        const exitGameBtn = document.getElementById('exit-game-btn');
         const presetImageButtons = document.querySelectorAll('.preset-image-btn');
 
         function updateFooterSpace() {
             const siteFooter = document.getElementById('site-footer');
             const footerHeight = siteFooter ? siteFooter.offsetHeight : 56;
             document.documentElement.style.setProperty('--footer-space', `${footerHeight}px`);
+        }
+
+        function setExitButtonVisible(visible) {
+            exitGameBtn.classList.toggle('active', visible);
+            if (visible) updateExitButtonPosition();
+        }
+
+        function updateExitButtonPosition() {
+            if (!hudPanel) return;
+            const hudRect = hudPanel.getBoundingClientRect();
+            if (hudRect.height > 0) {
+                exitGameBtn.style.top = `${hudRect.top + (hudRect.height / 2)}px`;
+            }
+        }
+
+        function handleExitGame() {
+            if (!gameLayout.classList.contains('active')) return;
+            const shouldExit = confirm('確定要退出目前遊戲並重新開始嗎？');
+            if (!shouldExit) return;
+            returnToIntro();
         }
 
         // --- 初始化 ---
@@ -633,6 +697,7 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             window.addEventListener('resize', updateFooterSpace);
+            window.addEventListener('resize', updateExitButtonPosition);
 
             // 監聽點擊與拖曳交換 (針對畫布區域)
             renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -645,10 +710,14 @@
             presetImageButtons.forEach(button => {
                 button.addEventListener('click', handlePresetImageSelect);
             });
+            exitGameBtn.addEventListener('click', handleExitGame);
+            setExitButtonVisible(false);
+            updateExitButtonPosition();
 
             // 原圖預覽互動
             previewBtn.addEventListener('click', () => {
                 if(currentImageDataUrl) {
+                    setExitButtonVisible(false);
                     previewImg.src = currentImageDataUrl;
                     previewOverlay.classList.add('active');
                 }
@@ -658,6 +727,8 @@
                 if (shouldStartAfterInitialPreview) {
                     shouldStartAfterInitialPreview = false;
                     startGame();
+                } else if (gameLayout.classList.contains('active')) {
+                    setExitButtonVisible(true);
                 }
             });
 
@@ -772,9 +843,11 @@
                     setTimeout(() => {
                         resizeCanvas();
                         gameLayout.classList.add('active');
+                        updateExitButtonPosition();
                         if (currentImageDataUrl) {
                             previewImg.src = currentImageDataUrl;
                             shouldStartAfterInitialPreview = true;
+                            setExitButtonVisible(false);
                             previewOverlay.classList.add('active');
                         } else {
                             startGame();
@@ -868,6 +941,7 @@
 
         function startGame() {
             modal.classList.remove('active');
+            setExitButtonVisible(true);
 
             moveCount = 0;
             timeSeconds = 0;
@@ -920,6 +994,14 @@
         function returnToIntro() {
             modal.classList.remove('active');
             gameLayout.classList.remove('active');
+            previewOverlay.classList.remove('active');
+            setExitButtonVisible(false);
+            isGameActive = false;
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
 
             while(puzzleGroup.children.length > 0){
                 const child = puzzleGroup.children[0];
