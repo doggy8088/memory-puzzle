@@ -58,6 +58,9 @@ jobs:
         run: |
           mkdir -p ~/.codex
           cat <<EOT > ~/.codex/config.toml
+          approval_policy = "on-request"
+          sandbox_mode   = "workspace-write"
+
           profile = "aoai"
 
           [features]
@@ -74,7 +77,7 @@ jobs:
 
           [profiles.aoai]
           model_provider = "azure"
-          model = "gpt-5.3-codex"
+          model = "gpt-5.2-codex"
           preferred_auth_method = "apikey"
           wire_api = "responses"
           model_reasoning_effort = "high"
