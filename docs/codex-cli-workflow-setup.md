@@ -28,8 +28,9 @@
 
 ### Secrets
 
-- `OPENAI_API_KEY`：給 `codex exec` 呼叫模型用，未設定會在驗證步驟直接失敗。
+- `AZURE_OPENAI_API_KEY_CODEX`：給 `codex exec` 呼叫模型用，未設定會在驗證步驟直接失敗。
 - `CODEX_GITHUB_TOKEN`：用於 `actions/checkout` 與後續 `git push` 驗證，也會注入為 `GITHUB_TOKEN` 供 Codex 執行時使用 GitHub 存取能力。
+- Workflow 會建立 `~/.codex/config.toml`，並寫入 Azure Foundry provider/profile（`aoai`）設定供 Codex 使用。
 
 > 為何 `CODEX_GITHUB_TOKEN` 必要：工作流程需要把新生成檔案推回分支；若沒有可寫入 repo 的 token，`git push` 會因未授權而失敗。
 
@@ -48,7 +49,7 @@
 
 ## 6) 基本疑難排解清單
 
-- `Missing OPENAI_API_KEY` / `Missing CODEX_GITHUB_TOKEN`：確認 Repository Secrets 已設定。
+- `Missing AZURE_OPENAI_API_KEY_CODEX` / `Missing CODEX_GITHUB_TOKEN`：確認 Repository Secrets 已設定。
 - `git push` 權限錯誤：確認 `CODEX_GITHUB_TOKEN` 具備 repo 寫入權限，且 workflow 保持 `contents: write`。
 - 工作流程沒自動跑：確認時區為 UTC，排程是每 6 小時不是本地時區整點。
 - `No newly added files to commit.`：代表本次沒有「新增檔案」，屬正常行為（修改舊檔不會觸發 commit）。

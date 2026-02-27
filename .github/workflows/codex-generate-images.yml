@@ -14,15 +14,24 @@ jobs:
     steps:
       - name: Validate required secrets
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_OPENAI_API_KEY_CODEX: ${{ secrets.AZURE_OPENAI_API_KEY_CODEX }}
           CODEX_GITHUB_TOKEN: ${{ secrets.CODEX_GITHUB_TOKEN }}
         run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "Missing OPENAI_API_KEY"
-            exit 1
+          missing=0
+
+          if [ -z "$AZURE_OPENAI_API_KEY_CODEX" ]; then
+            echo "Missing required secret: AZURE_OPENAI_API_KEY_CODEX"
+            missing=1
           fi
+
           if [ -z "$CODEX_GITHUB_TOKEN" ]; then
-            echo "Missing CODEX_GITHUB_TOKEN"
+            echo "Missing required secret: CODEX_GITHUB_TOKEN"
+            echo "This token must be able to push workflow files under .github/workflows/."
+            echo "Use a token with workflow write access (for example: classic PAT with repo + workflow scopes)."
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
@@ -45,9 +54,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Create Codex config for Azure
+        run: |
+          mkdir -p ~/.codex
+          cat <<EOT > ~/.codex/config.toml
+          profile = "aoai"
+
+          [features]
+          multi_agent = true
+          steer = true
+
+          # Azure Foundry
+          [model_providers.azure]
+          name = "Azure OpenAI"
+          base_url = "https://duotify-ai-foundry.cognitiveservices.azure.com/openai"
+          env_key = "AZURE_OPENAI_API_KEY_CODEX"
+          wire_api = "responses"
+          query_params = { api-version = "2025-04-01-preview" }
+
+          [profiles.aoai]
+          model_provider = "azure"
+          model = "gpt-5-codex"
+          preferred_auth_method = "apikey"
+          wire_api = "responses"
+          model_reasoning_effort = "high"
+          model_reasoning_summary = "detailed"
+          EOT
+
       - name: Run Codex
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_OPENAI_API_KEY_CODEX: ${{ secrets.AZURE_OPENAI_API_KEY_CODEX }}
           GITHUB_TOKEN: ${{ secrets.CODEX_GITHUB_TOKEN }}
         run: codex exec --dangerously-bypass-approvals-and-sandbox --color never "generate image using puzzle-image-generator skill"
 
