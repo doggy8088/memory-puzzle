@@ -12,7 +12,7 @@
             --glass-bg: rgba(255, 255, 255, 0.1);
             --glass-border: rgba(255, 255, 255, 0.2);
             --safe-bottom: env(safe-area-inset-bottom, 0px);
-            --footer-space: 48px;
+            --footer-space: 56px;
         }
 
         * {
@@ -117,7 +117,7 @@
         /* 底部控制列 */
         #controls-container {
             flex-shrink: 0;
-            padding: 10px 20px 30px 20px;
+            padding: 6px 20px calc(var(--footer-space) + var(--safe-bottom) + 4px) 20px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -278,7 +278,7 @@
             bottom: calc(var(--footer-space) + var(--safe-bottom));
             background-color: var(--bg-color);
             z-index: 300;
-            display: none; 
+            display: none;
             justify-content: center;
             align-items: center;
             flex-direction: column;
@@ -379,7 +379,7 @@
             text-align: center;
             font-size: 0.75rem;
             color: rgba(255, 255, 255, 0.45);
-            padding: 6px 10px;
+            padding: 10px 10px;
             background: rgba(0, 0, 0, 0.3);
             z-index: 10;
             pointer-events: none;
@@ -503,16 +503,16 @@
         let pieces = [];
         let particles = null;
         let puzzleGroup = new THREE.Group();
-        
+
         let gridRows = 4; // 預設 4x4 的正方形網格
         let gridCols = 4;
-        const gap = 0.05; 
-        
+        const gap = 0.05;
+
         let moveCount = 0;
         let timeSeconds = 0;
         let timerInterval = null;
         let isGameActive = false;
-        
+
         let selectedPiece = null;
         let baseTexture = null;
         let currentImageDataUrl = null;
@@ -566,13 +566,13 @@
             // 調整正方形畫布尺寸
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            
+
             // 監聽點擊 (針對畫布區域)
             renderer.domElement.addEventListener('pointerdown', onPointerDown);
-            
+
             // 監聽檔案上傳
             imageUpload.addEventListener('change', handleImageUpload);
-            
+
             // 原圖預覽互動
             previewBtn.addEventListener('click', () => {
                 if(currentImageDataUrl) {
@@ -592,16 +592,16 @@
         function resizeCanvas() {
             const width = canvasWrapper.clientWidth;
             const height = canvasWrapper.clientHeight;
-            
+
             // 取最小邊作為正方形的邊長
-            const size = Math.min(width, height) * 0.95; 
+            const size = Math.min(width, height) * 0.95;
 
             // 設定容器的寬高
             canvasContainer.style.width = `${size}px`;
             canvasContainer.style.height = `${size}px`;
 
             // 設定攝影機與渲染器
-            camera.aspect = 1; 
+            camera.aspect = 1;
             camera.updateProjectionMatrix();
             renderer.setSize(size, size);
         }
@@ -612,16 +612,16 @@
             if (!file) return;
 
             loadingScreen.classList.add('active');
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    const MAX_SIZE = 1024; 
-                    
+                    const MAX_SIZE = 1024;
+
                     // 取圖片的最短邊
                     const minSide = Math.min(img.width, img.height);
-                    
+
                     // 計算置中裁切的起始座標 (X, Y)
                     const startX = (img.width - minSide) / 2;
                     const startY = (img.height - minSide) / 2;
@@ -633,19 +633,19 @@
                     canvas.width = targetSize;
                     canvas.height = targetSize;
                     const ctx = canvas.getContext('2d');
-                    
+
                     // 將原圖置中裁切並繪製到正方形畫布上
                     // ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
                     ctx.drawImage(
-                        img, 
-                        startX, startY, minSide, minSide, 
+                        img,
+                        startX, startY, minSide, minSide,
                         0, 0, targetSize, targetSize
                     );
-                    
+
                     // 轉為 DataURL (經過裁切且品質優化的相片)
                     const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                    currentImageDataUrl = optimizedDataUrl; 
-                    
+                    currentImageDataUrl = optimizedDataUrl;
+
                     loadTextureAndStart(optimizedDataUrl);
                 }
                 img.src = e.target.result;
@@ -656,11 +656,11 @@
         // --- 載入材質與生成拼圖 ---
         function loadTextureAndStart(imageUrl) {
             const loader = new THREE.TextureLoader();
-            
-            loader.load(imageUrl, 
+
+            loader.load(imageUrl,
                 function(texture) {
                     baseTexture = texture;
-                    
+
                     // 由於圖片已經在裁切階段變成完美的 1:1 正方形
                     // 因此固定總寬高皆為 8，並且使用 4x4 的網格
                     const totalWidth = 8;
@@ -669,12 +669,12 @@
                     gridCols = 4;
 
                     createPuzzle(totalWidth, totalHeight);
-                    
+
                     // 切換 UI，顯示遊戲排版
                     introScreen.style.opacity = '0';
                     introScreen.style.visibility = 'hidden';
                     loadingScreen.classList.remove('active');
-                    
+
                     // 確保畫布尺寸正確後，再顯示遊戲介面
                     setTimeout(() => {
                         resizeCanvas();
@@ -691,11 +691,11 @@
         }
 
         function createPuzzle(totalWidth, totalHeight) {
-            while(puzzleGroup.children.length > 0){ 
+            while(puzzleGroup.children.length > 0){
                 const child = puzzleGroup.children[0];
                 if(child.geometry) child.geometry.dispose();
                 if(child.material) child.material.dispose();
-                puzzleGroup.remove(child); 
+                puzzleGroup.remove(child);
             }
             pieces = [];
             puzzleGroup.rotation.set(0,0,0);
@@ -732,7 +732,7 @@
                     metalness: 0.1,
                     color: 0xffffff
                 });
-                
+
                 material.map.needsUpdate = true;
                 material.map.repeat.set(1 / gridCols, 1 / gridRows);
                 material.map.offset.set(targetPos.c / gridCols, (gridRows - 1 - targetPos.r) / gridRows);
@@ -769,7 +769,7 @@
 
         function startGame() {
             modal.classList.remove('active');
-            
+
             moveCount = 0;
             timeSeconds = 0;
             isGameActive = true;
@@ -801,12 +801,12 @@
         function returnToIntro() {
             modal.classList.remove('active');
             gameLayout.classList.remove('active');
-            
-            while(puzzleGroup.children.length > 0){ 
+
+            while(puzzleGroup.children.length > 0){
                 const child = puzzleGroup.children[0];
                 if(child.geometry) child.geometry.dispose();
                 if(child.material) child.material.dispose();
-                puzzleGroup.remove(child); 
+                puzzleGroup.remove(child);
             }
             if(particles) {
                 scene.remove(particles);
@@ -828,7 +828,7 @@
             if (!isGameActive) return;
 
             const rect = renderer.domElement.getBoundingClientRect();
-            
+
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -847,7 +847,7 @@
                     } else {
                         swapPieces(selectedPiece, clickedPiece);
                         selectedPiece = null;
-                        
+
                         moveCount++;
                         updateHUD();
                     }
@@ -934,7 +934,7 @@
                 const pHeight = piece.userData.height;
                 const tWidth = pWidth * gridCols;
                 const tHeight = pHeight * gridRows;
-                
+
                 const exactX = (piece.userData.currentC * pWidth) - (tWidth / 2) + (pWidth / 2);
                 const exactY = -((piece.userData.currentR * pHeight) - (tHeight / 2) + (pHeight / 2));
 
@@ -959,7 +959,7 @@
                     .to({ y: Math.PI * 2, x: 0.1 }, 3000)
                     .easing(TWEEN.Easing.Cubic.InOut)
                     .start();
-                
+
                 createConfetti();
             }, 600);
 
@@ -1056,7 +1056,9 @@
 
     <!-- 頁尾版權聲明 -->
     <footer id="site-footer">
-        本站由 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer">Will 保哥的技術交流中心</a> 設計、開發與維護 &nbsp;|&nbsp; Copyright &copy; 2026 Will 保哥
+        本站由 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer">Will 保哥的技術交流中心</a> 設計、開發與維護
+        <br>
+        Copyright &copy; 2026 Will 保哥
     </footer>
 </body>
 </html>
