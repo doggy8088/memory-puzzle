@@ -117,7 +117,7 @@
         /* 底部控制列 */
         #controls-container {
             flex-shrink: 0;
-            padding: 6px 20px calc(var(--footer-space) + var(--safe-bottom) + 4px) 20px;
+            padding: 6px 20px calc(var(--footer-space) + var(--safe-bottom) + 14px) 20px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -154,7 +154,7 @@
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
-            z-index: 150;
+            z-index: 1000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -378,7 +378,7 @@
             color: rgba(255, 255, 255, 0.45);
             padding: 10px 10px;
             background: rgba(0, 0, 0, 0.3);
-            z-index: 10;
+            z-index: 1200;
             pointer-events: none;
         }
 
@@ -403,12 +403,13 @@
         }
     </style>
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PVHEZD5XM3"></script>
     <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-XXXXXXXXXX');
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-PVHEZD5XM3');
     </script>
 </head>
 <body>
@@ -458,8 +459,8 @@
             <h1 class="intro-title">回憶 3D 拼圖</h1>
             <p class="intro-text">
                 每個碎片都承載著一段故事。<br>
-                請上傳或選擇一張對您具有特別意義的照片，<br>
-                讓我們一起在平靜的時光中，將它溫柔地重組。
+                請選擇一張對您具有特別意義的照片，<br>
+                讓我們一起在平靜的時光中，<br>將它溫柔地重組。
             </p>
             <div class="upload-btn-wrapper">
                 <button class="btn-primary">選擇或拍攝照片</button>
@@ -511,6 +512,11 @@
         let isGameActive = false;
 
         let selectedPiece = null;
+        let dragSourcePiece = null;
+        let activePointerId = null;
+        let isDraggingPiece = false;
+        let dragStartClientX = 0;
+        let dragStartClientY = 0;
         let baseTexture = null;
         let currentImageDataUrl = null;
 
@@ -527,6 +533,12 @@
         const previewBtn = document.getElementById('preview-btn');
         const previewOverlay = document.getElementById('preview-overlay');
         const previewImg = document.getElementById('preview-img');
+
+        function updateFooterSpace() {
+            const siteFooter = document.getElementById('site-footer');
+            const footerHeight = siteFooter ? siteFooter.offsetHeight : 56;
+            document.documentElement.style.setProperty('--footer-space', `${footerHeight}px`);
+        }
 
         // --- 初始化 ---
         function init() {
@@ -561,11 +573,16 @@
             scene.add(puzzleGroup);
 
             // 調整正方形畫布尺寸
+            updateFooterSpace();
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('resize', updateFooterSpace);
 
-            // 監聽點擊 (針對畫布區域)
+            // 監聽點擊與拖曳交換 (針對畫布區域)
             renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerup', onPointerUp);
+            renderer.domElement.addEventListener('pointercancel', onPointerCancel);
 
             // 監聽檔案上傳
             imageUpload.addEventListener('change', handleImageUpload);
@@ -771,6 +788,9 @@
             timeSeconds = 0;
             isGameActive = true;
             selectedPiece = null;
+            dragSourcePiece = null;
+            activePointerId = null;
+            isDraggingPiece = false;
             updateHUD();
 
             if(particles) {
@@ -820,23 +840,39 @@
         // --- 滑鼠與觸控互動 ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
+        const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.5);
+        const dragPoint = new THREE.Vector3();
+        const DRAG_START_THRESHOLD = 8;
 
-        function onPointerDown(event) {
-            if (!isGameActive) return;
-
+        function getPieceFromPointer(event, excludedPiece = null) {
             const rect = renderer.domElement.getBoundingClientRect();
-
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(pieces);
+            if (!excludedPiece) {
+                return intersects.length > 0 ? intersects[0].object : null;
+            }
+            for (let i = 0; i < intersects.length; i++) {
+                if (intersects[i].object !== excludedPiece) return intersects[i].object;
+            }
+            return null;
+        }
 
-            if (intersects.length > 0) {
-                const clickedPiece = intersects[0].object;
+        function onPointerDown(event) {
+            if (!isGameActive) return;
 
+            const clickedPiece = getPieceFromPointer(event);
+            if (clickedPiece) {
                 if (selectedPiece === null) {
                     selectPiece(clickedPiece);
+                    dragSourcePiece = clickedPiece;
+                    activePointerId = event.pointerId;
+                    dragStartClientX = event.clientX;
+                    dragStartClientY = event.clientY;
+                    isDraggingPiece = false;
+                    renderer.domElement.setPointerCapture(event.pointerId);
                 } else {
                     if (selectedPiece === clickedPiece) {
                         deselectPiece(selectedPiece);
@@ -844,16 +880,100 @@
                     } else {
                         swapPieces(selectedPiece, clickedPiece);
                         selectedPiece = null;
-
                         moveCount++;
                         updateHUD();
                     }
+                    dragSourcePiece = null;
+                    activePointerId = null;
+                    isDraggingPiece = false;
                 }
             } else {
                 if (selectedPiece) {
                     deselectPiece(selectedPiece);
                     selectedPiece = null;
                 }
+                dragSourcePiece = null;
+                activePointerId = null;
+                isDraggingPiece = false;
+            }
+        }
+
+        function onPointerMove(event) {
+            if (!isGameActive || !dragSourcePiece) return;
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
+
+            const dragDistance = Math.hypot(event.clientX - dragStartClientX, event.clientY - dragStartClientY);
+            if (!isDraggingPiece && dragDistance < DRAG_START_THRESHOLD) return;
+            if (!isDraggingPiece) {
+                isDraggingPiece = true;
+                dragSourcePiece.position.z = 0.5;
+            }
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            dragPlane.constant = -dragSourcePiece.position.z;
+            if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
+                dragSourcePiece.position.x = dragPoint.x;
+                dragSourcePiece.position.y = dragPoint.y;
+            }
+        }
+
+        function onPointerUp(event) {
+            if (!isGameActive || !dragSourcePiece) return;
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
+
+            const targetPiece = isDraggingPiece ? getPieceFromPointer(event, dragSourcePiece) : null;
+            if (isDraggingPiece && selectedPiece === dragSourcePiece && targetPiece) {
+                swapPieces(dragSourcePiece, targetPiece);
+                selectedPiece = null;
+                moveCount++;
+                updateHUD();
+            } else if (isDraggingPiece && selectedPiece === dragSourcePiece) {
+                const pWidth = dragSourcePiece.userData.width;
+                const pHeight = dragSourcePiece.userData.height;
+                const tWidth = pWidth * gridCols;
+                const tHeight = pHeight * gridRows;
+                const homePos = get3DPosition(dragSourcePiece.userData.currentR, dragSourcePiece.userData.currentC, pWidth, pHeight, tWidth, tHeight);
+                new TWEEN.Tween(dragSourcePiece.position)
+                    .to({ x: homePos.x, y: homePos.y, z: 0.5 }, 180)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            dragSourcePiece = null;
+            activePointerId = null;
+            isDraggingPiece = false;
+
+            if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+                renderer.domElement.releasePointerCapture(event.pointerId);
+            }
+        }
+
+        function onPointerCancel(event) {
+            if (!dragSourcePiece) return;
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
+
+            if (isDraggingPiece && selectedPiece === dragSourcePiece) {
+                const pWidth = dragSourcePiece.userData.width;
+                const pHeight = dragSourcePiece.userData.height;
+                const tWidth = pWidth * gridCols;
+                const tHeight = pHeight * gridRows;
+                const homePos = get3DPosition(dragSourcePiece.userData.currentR, dragSourcePiece.userData.currentC, pWidth, pHeight, tWidth, tHeight);
+                new TWEEN.Tween(dragSourcePiece.position)
+                    .to({ x: homePos.x, y: homePos.y, z: 0.5 }, 180)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            dragSourcePiece = null;
+            activePointerId = null;
+            isDraggingPiece = false;
+
+            if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+                renderer.domElement.releasePointerCapture(event.pointerId);
             }
         }
 
