@@ -86,6 +86,7 @@ jobs:
 
       - name: Run Codex
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AZURE_OPENAI_API_KEY_CODEX: ${{ secrets.AZURE_OPENAI_API_KEY_CODEX }}
           GITHUB_TOKEN: ${{ secrets.CODEX_GITHUB_TOKEN }}
         run: codex exec --dangerously-bypass-approvals-and-sandbox --color never "generate image using puzzle-image-generator skill"
