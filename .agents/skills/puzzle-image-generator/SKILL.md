@@ -146,15 +146,11 @@ Use this default numbering logic for `--name` argument:
 After generating images, derive `N` from current generated files before updating code:
 1. Scan `images/generated-*.png`.
 2. Extract numeric suffixes and set `N` to the maximum suffix (example: latest is `generated-14.png` => `N = 14`).
-3. Replace hard-coded magic numbers with `N`, for example:
+3. Replace hard-coded magic numbers with `N` in the `index.html` file, for example:
 
-```js
-const generatedSources = Array.from({ length: 10 }, (_, i) => `images/generated-${i + 1}.png`);
-```
-
-```js
-const generatedSources = Array.from({ length: N }, (_, i) => `images/generated-${i + 1}.png`);
-```
+   ```js
+   const GENERATED_NUMBERS = 15; // Replace 15 with N
+   ```
 
 ## Script Notes
 - Requires `GEMINI_API_KEY` in the environment.
