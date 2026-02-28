@@ -688,8 +688,10 @@
             }
         }
 
+        const GENERATED_NUMBERS = 15;
+
         function getGeneratedPresetSources() {
-            const generatedSources = Array.from({ length: 10 }, (_, i) => `images/generated-${i + 1}.png`);
+            const generatedSources = Array.from({ length: GENERATED_NUMBERS }, (_, i) => `images/generated-${i + 1}.png`);
             return pickRandomItems(generatedSources, 4);
         }
 
