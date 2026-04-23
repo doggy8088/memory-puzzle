@@ -63,10 +63,6 @@ jobs:
 
           profile = "aoai"
 
-          [features]
-          multi_agent = true
-          steer = true
-
           # Azure Foundry
           [model_providers.azure]
           name = "Azure OpenAI"
@@ -77,11 +73,10 @@ jobs:
 
           [profiles.aoai]
           model_provider = "azure"
-          model = "gpt-5.2-codex"
+          model = "gpt-5.4"
           preferred_auth_method = "apikey"
           wire_api = "responses"
-          model_reasoning_effort = "high"
-          model_reasoning_summary = "detailed"
+          model_reasoning_effort = "medium"
           EOT
 
       - name: Run Codex
